@@ -1,0 +1,78 @@
+#!/bin/sh
+
+json() {
+	# Loop through branches
+	echo "["
+	branchFirst=0
+	while read oldsha newsha refname; do
+		
+		# Check for initial comma
+		if [ "$branchFirst" -eq "0" ]
+		then
+			branchFirst=1
+		else 
+			echo ","
+		fi
+		
+		# Print branch details
+		echo -n '{
+			"branch":"'$refname'",
+			"commits":['
+			
+		# Check for initial sha
+		if [ "$oldsha" == "0000000000000000000000000000000000000000" ]; then
+			shalist=$(git rev-list $newsha)
+		else
+			shalist=$(git rev-list $oldsha..$newsha)
+		fi
+
+		# Loop through commits
+		commitFirst=0
+		for sha in $shalist; do
+		
+			# Check for initial comma
+			if [ "$commitFirst" -eq "0" ]
+			then
+				commitFirst=1
+			else 
+				echo ","
+			fi
+			
+			# Print commit details
+			echo -n $(git show --quiet --format='{
+				"author":{
+					"name":"%an",
+					"mail":"%ae",
+					"date":"%aD"
+				},
+				"committer":{
+					"name":"%an",
+					"mail":"%ae",
+					"date":"%aD"
+				},
+				"message":"%s",
+				"sha":"'$sha'"
+			}' $sha)
+		done
+		echo ']}'
+	done
+	echo ']'
+}
+
+filename="post-receive_$RANDOM.json"
+json > "$filename"
+response=$(curl -H "Accept: application/json" -H "Content-Type:application/json" -X POST -d "@$filename" --silent --write-out "\n%{http_code}" http://indtfazilv/git-smart-http/post-receive)
+rm -f "$filename"
+
+IFS=$'\n'
+for line in $response; do
+	status="$status$error"
+	error="$line"$'\n'
+done
+status="${status%?}"
+error="${error%?}"
+
+if [ "$error" -ge "400" ]; then
+	echo "$status"
+	exit 1
+fi

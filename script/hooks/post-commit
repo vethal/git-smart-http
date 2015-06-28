@@ -1,0 +1,19 @@
+#!/bin/sh
+
+filename="post-commit_$RANDOM.json"
+json > "$filename"
+response=$(curl -H "Accept: application/json" -H "Content-Type:application/json" -X POST -d "@$filename" --silent --write-out "\n%{http_code}" http://indtfazilv/git-smart-http/post-commit)
+rm -f "$filename"
+
+IFS=$'\n'
+for line in $response; do
+	status="$status$error"
+	error="$line"$'\n'
+done
+status="${status%?}"
+error="${error%?}"
+
+if [ "$error" -ge "400" ]; then
+	echo "$status"
+	exit 1
+fi
